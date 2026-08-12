@@ -85,6 +85,68 @@ make
 
 ---
 
+## ⚙️ 常駐（自動起動）とインストールの設定
+
+本アプリケーションをシステムの起動（ログイン）時に自動で実行し、バックグラウンドに常駐させるには、以下の手順でインストールと自動起動（Autostart）設定を行います。
+
+### 1. 実行ファイルのインストール（配置）
+
+ビルドして生成された実行ファイル `AutoShutdown` を、パスの通ったディレクトリ（例: `/usr/local/bin` または個人の `~/.local/bin`）にコピーします。
+
+```bash
+# システム全体にインストールする場合（推奨）
+sudo cp AutoShutdown /usr/local/bin/
+
+# または、現在のユーザーのみのディレクトリにインストールする場合
+mkdir -p ~/.local/bin
+cp AutoShutdown ~/.local/bin/
+```
+
+### 2. 自動起動（スタートアップ）への登録
+
+デスクトップ環境（GNOME等）の起動時にアプリを自動起動させるため、`~/.config/autostart/` ディレクトリにデスクトップエントリファイルを作成します。
+
+```bash
+# 自動起動設定ディレクトリを作成（存在しない場合）
+mkdir -p ~/.config/autostart
+
+# 設定ファイルの作成・編集
+nano ~/.config/autostart/autoshutdown.desktop
+```
+
+ファイルの内容として以下を入力して保存します。
+
+**`/usr/local/bin/` に配置した場合：**
+```ini
+[Desktop Entry]
+Type=Application
+Name=AutoShutdown
+Comment=Idle detection and auto shutdown service
+Exec=/usr/local/bin/AutoShutdown
+Icon=system-shutdown
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
+```
+
+**`~/.local/bin/` に配置した場合：**
+（※ `Exec` のパスをご自身のホームディレクトリに合わせて変更してください）
+```ini
+[Desktop Entry]
+Type=Application
+Name=AutoShutdown
+Comment=Idle detection and auto shutdown service
+Exec=/home/ご自身のユーザー名/.local/bin/AutoShutdown
+Icon=system-shutdown
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
+```
+
+これで、次回ログイン時から自動的にアプリケーションが起動し、システムトレイ（タスクトレイ）に常駐してアイドル監視を開始します。
+
+---
+
 ## 📄 ライセンス
 
 このプロジェクトは [MIT ライセンス](LICENSE) のもとで公開されています。
