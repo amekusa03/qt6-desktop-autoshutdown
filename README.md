@@ -116,13 +116,17 @@ nano ~/.config/autostart/autoshutdown.desktop
 
 ファイルの内容として以下を入力して保存します。
 
+> [!IMPORTANT]
+> `Exec=` の末尾に **`--minimized`** を付けることで、ログイン時にウィンドウを開かずトレイに常駐するだけの状態で起動します。
+> この引数を省略すると、ログインのたびにウィンドウが表示されます。
+
 **`/usr/local/bin/` に配置した場合：**
 ```ini
 [Desktop Entry]
 Type=Application
 Name=AutoShutdown
 Comment=Idle detection and auto shutdown service
-Exec=/usr/local/bin/AutoShutdown
+Exec=/usr/local/bin/AutoShutdown --minimized
 Icon=system-shutdown
 Terminal=false
 Categories=Utility;
@@ -136,7 +140,7 @@ X-GNOME-Autostart-enabled=true
 Type=Application
 Name=AutoShutdown
 Comment=Idle detection and auto shutdown service
-Exec=/home/ご自身のユーザー名/.local/bin/AutoShutdown
+Exec=/home/ご自身のユーザー名/.local/bin/AutoShutdown --minimized
 Icon=system-shutdown
 Terminal=false
 Categories=Utility;
@@ -144,6 +148,7 @@ X-GNOME-Autostart-enabled=true
 ```
 
 これで、次回ログイン時から自動的にアプリケーションが起動し、システムトレイ（タスクトレイ）に常駐してアイドル監視を開始します。
+ウィンドウを開くにはトレイアイコンをクリックしてください。
 
 ---
 

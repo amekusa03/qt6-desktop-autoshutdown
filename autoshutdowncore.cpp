@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QDebug>
 #include <QCoreApplication>
+#include <QStandardPaths>
 #include <QtDBus/QDBusInterface>
 #include <QtDBus/QDBusReply>
 
@@ -18,7 +19,9 @@ AutoShutdownCore::AutoShutdownCore(const QString &configPath, QObject *parent)
     , m_currentIdleTime(-1)
 {
     if (m_configPath.isEmpty()) {
-        m_configPath = QDir(qApp->applicationDirPath()).filePath("config.ini");
+        QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+        QDir().mkpath(configDir);
+        m_configPath = QDir(configDir).filePath("config.ini");
     }
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this, &AutoShutdownCore::checkLoop);
@@ -34,9 +37,11 @@ AutoShutdownCore::~AutoShutdownCore()
 void AutoShutdownCore::loadConfig()
 {
     QSettings settings(m_configPath, QSettings::IniFormat);
-    m_idleTimeout = settings.value("general/idle_timeout", 300).toInt();
-    m_checkInterval = settings.value("general/check_interval", 10).toInt();
-    m_enabled = settings.value("general/enabled", true).toBool();
+    settings.beginGroup("Settings");
+    m_idleTimeout = settings.value("idle_timeout", 300).toInt();
+    m_checkInterval = settings.value("check_interval", 10).toInt();
+    m_enabled = settings.value("enabled", true).toBool();
+    settings.endGroup();
 
     qDebug() << "Config loaded: idle_timeout =" << m_idleTimeout
              << ", check_interval =" << m_checkInterval
@@ -46,9 +51,11 @@ void AutoShutdownCore::loadConfig()
 void AutoShutdownCore::saveConfig()
 {
     QSettings settings(m_configPath, QSettings::IniFormat);
-    settings.setValue("general/idle_timeout", m_idleTimeout);
-    settings.setValue("general/check_interval", m_checkInterval);
-    settings.setValue("general/enabled", m_enabled);
+    settings.beginGroup("Settings");
+    settings.setValue("idle_timeout", m_idleTimeout);
+    settings.setValue("check_interval", m_checkInterval);
+    settings.setValue("enabled", m_enabled);
+    settings.endGroup();
     settings.sync();
 
     qDebug() << "Config saved: idle_timeout =" << m_idleTimeout
