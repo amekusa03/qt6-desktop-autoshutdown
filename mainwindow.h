@@ -7,6 +7,9 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSlider>
+#include <QSpinBox>
+#include <QLineEdit>
+#include <QCheckBox>
 #include <QCloseEvent>
 #include "autoshutdowncore.h"
 
@@ -53,6 +56,13 @@ private:
     QLabel *m_lblTimeoutVal;
     QSlider *m_sliderInterval;
     QLabel *m_lblIntervalVal;
+
+    // TCP UI要素
+    QCheckBox *m_chkTcpEnabled;
+    QSpinBox *m_spinTcpPort;
+    QLineEdit *m_txtTcpToken;
+    QLabel *m_lblTcpStatus;
+
     QPushButton *m_saveBtn;
     QPushButton *m_cancelBtn;
     QPushButton *m_logBtn;

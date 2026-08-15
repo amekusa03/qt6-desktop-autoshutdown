@@ -14,7 +14,7 @@ MainWindow::MainWindow(AutoShutdownCore *core, QWidget *parent)
     , m_core(core)
 {
     setWindowTitle("AutoShutdown");
-    setFixedSize(480, 580);
+    setFixedSize(480, 680);
 
     buildUi();
     setupTrayIcon();
@@ -45,14 +45,14 @@ void MainWindow::buildUi()
     // ---------------------------
     QFrame *headerFrame = new QFrame(centralWidget);
     headerFrame->setObjectName("headerFrame");
-    headerFrame->setFixedHeight(120);
+    headerFrame->setFixedHeight(100);
     QVBoxLayout *headerLayout = new QVBoxLayout(headerFrame);
-    headerLayout->setContentsMargins(0, 15, 0, 15);
-    headerLayout->setSpacing(4);
+    headerLayout->setContentsMargins(0, 10, 0, 10);
+    headerLayout->setSpacing(2);
 
     QLabel *lblIcon = new QLabel("⏻", headerFrame);
     lblIcon->setAlignment(Qt::AlignCenter);
-    lblIcon->setStyleSheet("font-size: 36px; color: #e94560;");
+    lblIcon->setStyleSheet("font-size: 32px; color: #e94560;");
     headerLayout->addWidget(lblIcon);
 
     QLabel *lblTitle = new QLabel("Auto Shutdown", headerFrame);
@@ -60,7 +60,7 @@ void MainWindow::buildUi()
     lblTitle->setStyleSheet("font-size: 16px; font-weight: bold; color: #eaeaea;");
     headerLayout->addWidget(lblTitle);
 
-    QLabel *lblSub = new QLabel("無操作検出時に自動シャットダウン", headerFrame);
+    QLabel *lblSub = new QLabel("無操作検出・TCPコマンド対応シャットダウン", headerFrame);
     lblSub->setAlignment(Qt::AlignCenter);
     lblSub->setStyleSheet("font-size: 11px; color: #a0a0b8;");
     headerLayout->addWidget(lblSub);
@@ -68,18 +68,18 @@ void MainWindow::buildUi()
     mainLayout->addWidget(headerFrame);
 
     // ---------------------------
-    // コンテンツ部（マージンあり）
+    // コンテンツ部
     // ---------------------------
     QVBoxLayout *contentLayout = new QVBoxLayout();
-    contentLayout->setContentsMargins(24, 16, 24, 16);
-    contentLayout->setSpacing(12);
+    contentLayout->setContentsMargins(24, 12, 24, 12);
+    contentLayout->setSpacing(10);
 
     // ステータスカード
     QFrame *statusFrame = new QFrame(centralWidget);
     statusFrame->setObjectName("statusFrame");
-    statusFrame->setFixedHeight(110);
+    statusFrame->setFixedHeight(95);
     QVBoxLayout *statusLayout = new QVBoxLayout(statusFrame);
-    statusLayout->setContentsMargins(16, 12, 16, 12);
+    statusLayout->setContentsMargins(16, 8, 16, 8);
     statusLayout->setSpacing(4);
 
     QLabel *lblStatusTitle = new QLabel("現在のステータス", statusFrame);
@@ -95,7 +95,7 @@ void MainWindow::buildUi()
     lblIdleTitle->setStyleSheet("font-size: 10px; color: #606080;");
     m_lblIdle = new QLabel("--:--", statusFrame);
     m_lblIdle->setAlignment(Qt::AlignCenter);
-    m_lblIdle->setStyleSheet("font-size: 26px; font-weight: bold; color: #eaeaea;");
+    m_lblIdle->setStyleSheet("font-size: 24px; font-weight: bold; color: #eaeaea;");
     idleCol->addWidget(lblIdleTitle);
     idleCol->addWidget(m_lblIdle);
     statusRow->addLayout(idleCol);
@@ -114,7 +114,7 @@ void MainWindow::buildUi()
     lblRemTitle->setStyleSheet("font-size: 10px; color: #606080;");
     m_lblRemaining = new QLabel("--:--", statusFrame);
     m_lblRemaining->setAlignment(Qt::AlignCenter);
-    m_lblRemaining->setStyleSheet("font-size: 26px; font-weight: bold; color: #2ecc71;");
+    m_lblRemaining->setStyleSheet("font-size: 24px; font-weight: bold; color: #2ecc71;");
     remCol->addWidget(lblRemTitle);
     remCol->addWidget(m_lblRemaining);
     statusRow->addLayout(remCol);
@@ -126,7 +126,7 @@ void MainWindow::buildUi()
     m_lblMsg = new QLabel("", centralWidget);
     m_lblMsg->setAlignment(Qt::AlignCenter);
     m_lblMsg->setStyleSheet("font-size: 11px; color: #e74c3c; font-weight: bold;");
-    m_lblMsg->setFixedHeight(20);
+    m_lblMsg->setFixedHeight(18);
     contentLayout->addWidget(m_lblMsg);
 
     // コントロール：有効トグル
@@ -181,6 +181,47 @@ void MainWindow::buildUi()
     intervalRow->addWidget(m_sliderInterval);
     intervalRow->addWidget(m_lblIntervalVal);
     contentLayout->addLayout(intervalRow);
+
+    // ---------------------------
+    // TCP リモート設定セクション
+    // ---------------------------
+    QFrame *tcpSectionLine = new QFrame(centralWidget);
+    tcpSectionLine->setFrameShape(QFrame::HLine);
+    tcpSectionLine->setFrameShadow(QFrame::Sunken);
+    tcpSectionLine->setStyleSheet("color: #0f3460;");
+    contentLayout->addWidget(tcpSectionLine);
+
+    m_chkTcpEnabled = new QCheckBox("TCPリモート制御を有効化", centralWidget);
+    m_chkTcpEnabled->setChecked(m_core->isTcpEnabled());
+    contentLayout->addWidget(m_chkTcpEnabled);
+
+    QHBoxLayout *tcpPortRow = new QHBoxLayout();
+    QLabel *lblTcpPort = new QLabel("TCPポート", centralWidget);
+    lblTcpPort->setStyleSheet("font-size: 12px; color: #eaeaea;");
+    m_spinTcpPort = new QSpinBox(centralWidget);
+    m_spinTcpPort->setRange(1, 65535);
+    m_spinTcpPort->setValue(m_core->tcpPort());
+    m_spinTcpPort->setFixedWidth(100);
+    tcpPortRow->addWidget(lblTcpPort);
+    tcpPortRow->addStretch();
+    tcpPortRow->addWidget(m_spinTcpPort);
+    contentLayout->addLayout(tcpPortRow);
+
+    QHBoxLayout *tcpTokenRow = new QHBoxLayout();
+    QLabel *lblTcpToken = new QLabel("シャットダウントークン", centralWidget);
+    lblTcpToken->setStyleSheet("font-size: 12px; color: #eaeaea;");
+    m_txtTcpToken = new QLineEdit(centralWidget);
+    m_txtTcpToken->setText(m_core->tcpToken());
+    m_txtTcpToken->setPlaceholderText("secret123");
+    m_txtTcpToken->setFixedWidth(160);
+    tcpTokenRow->addWidget(lblTcpToken);
+    tcpTokenRow->addStretch();
+    tcpTokenRow->addWidget(m_txtTcpToken);
+    contentLayout->addLayout(tcpTokenRow);
+
+    m_lblTcpStatus = new QLabel("", centralWidget);
+    m_lblTcpStatus->setStyleSheet("font-size: 11px; color: #606080;");
+    contentLayout->addWidget(m_lblTcpStatus);
 
     // ボタン行（保存・キャンセル）
     QHBoxLayout *btnRow = new QHBoxLayout();
@@ -296,7 +337,7 @@ void MainWindow::applyTheme()
             background-color: #2ecc71;
         }
         #toggleBtn[enabled="true"]:hover {
-            background-color: #2ee287; /* slightly brighter success color */
+            background-color: #2ee287;
         }
         #toggleBtn[enabled="false"] {
             background-color: #16213e;
@@ -334,6 +375,17 @@ void MainWindow::applyTheme()
             background: #e94560;
             border-radius: 3px;
         }
+        QLineEdit, QSpinBox {
+            background-color: #16213e;
+            color: #eaeaea;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            padding: 4px 8px;
+        }
+        QCheckBox {
+            color: #eaeaea;
+            font-size: 12px;
+        }
     )";
     setStyleSheet(qss);
 }
@@ -361,7 +413,6 @@ QIcon MainWindow::createTrayIcon(bool enabled, bool warning)
 
     int r_outer = size / 2 - 12;
     QRectF arcRect(size/2 - r_outer, size/2 - r_outer, r_outer * 2, r_outer * 2);
-    // Draw arc from 50 to 310 deg
     painter.drawArc(arcRect, (90 - 130) * 16, (360 - 100) * 16);
 
     painter.drawLine(size/2, size/2 - r_outer - 2, size/2, size/2 - (r_outer - 8));
@@ -383,6 +434,11 @@ void MainWindow::updateDisplay(const QVariantMap &status)
     QVariant idle = status["idle_time"];
     QVariant remaining = status["remaining"];
     bool warning = status["shutdown_triggered"].toBool();
+
+    bool tcpEnabled = status["tcp_enabled"].toBool();
+    int tcpPort = status["tcp_port"].toInt();
+    bool tcpListening = status["tcp_listening"].toBool();
+    QString tcpToken = status["tcp_token"].toString();
 
     // 有効/無効トグルボタン更新
     m_toggleBtn->setText(enabled ? "ON" : "OFF");
@@ -406,15 +462,31 @@ void MainWindow::updateDisplay(const QVariantMap &status)
 
         double pct = remSec / qMax(1, m_core->idleTimeout());
         if (pct > 0.3) {
-            m_lblRemaining->setStyleSheet("font-size: 26px; font-weight: bold; color: #2ecc71;"); // 緑
+            m_lblRemaining->setStyleSheet("font-size: 24px; font-weight: bold; color: #2ecc71;"); // 緑
         } else if (pct > 0.1) {
-            m_lblRemaining->setStyleSheet("font-size: 26px; font-weight: bold; color: #f39c12;"); // オレンジ
+            m_lblRemaining->setStyleSheet("font-size: 24px; font-weight: bold; color: #f39c12;"); // オレンジ
         } else {
-            m_lblRemaining->setStyleSheet("font-size: 26px; font-weight: bold; color: #e74c3c;"); // 赤
+            m_lblRemaining->setStyleSheet("font-size: 24px; font-weight: bold; color: #e74c3c;"); // 赤
         }
     } else {
         m_lblRemaining->setText("--:--");
-        m_lblRemaining->setStyleSheet("font-size: 26px; font-weight: bold; color: #eaeaea;");
+        m_lblRemaining->setStyleSheet("font-size: 24px; font-weight: bold; color: #eaeaea;");
+    }
+
+    // TCPステータス表示
+    if (m_lblTcpStatus) {
+        if (tcpEnabled) {
+            if (tcpListening) {
+                m_lblTcpStatus->setText(QString("🟢 待受中 (ポート: %1)").arg(tcpPort));
+                m_lblTcpStatus->setStyleSheet("font-size: 11px; color: #2ecc71;");
+            } else {
+                m_lblTcpStatus->setText(QString("🔴 ポート %1 でバインド失敗").arg(tcpPort));
+                m_lblTcpStatus->setStyleSheet("font-size: 11px; color: #e74c3c;");
+            }
+        } else {
+            m_lblTcpStatus->setText("⚪ TCPリモート制御は無効");
+            m_lblTcpStatus->setStyleSheet("font-size: 11px; color: #606080;");
+        }
     }
 
     // 警告メッセージとキャンセルボタン
@@ -451,6 +523,17 @@ void MainWindow::applySettings()
     m_core->setIdleTimeout(m_sliderTimeout->value());
     m_core->setCheckInterval(m_sliderInterval->value());
     m_core->setEnabled(m_toggleBtn->property("enabled").toBool());
+
+    if (m_chkTcpEnabled) {
+        m_core->setTcpEnabled(m_chkTcpEnabled->isChecked());
+    }
+    if (m_spinTcpPort) {
+        m_core->setTcpPort(m_spinTcpPort->value());
+    }
+    if (m_txtTcpToken) {
+        m_core->setTcpToken(m_txtTcpToken->text().trimmed());
+    }
+
     m_core->saveConfig();
 
     m_lblMsg->setStyleSheet("font-size: 11px; color: #2ecc71; font-weight: bold;");

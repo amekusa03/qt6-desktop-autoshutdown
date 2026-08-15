@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QTimer>
 #include <QVariantMap>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 class AutoShutdownCore : public QObject
 {
@@ -25,17 +27,30 @@ public:
     int checkInterval() const { return m_checkInterval; }
     void setCheckInterval(int interval);
 
+    // TCP ゲッター／セッター
+    bool isTcpEnabled() const { return m_tcpEnabled; }
+    void setTcpEnabled(bool enabled);
+
+    int tcpPort() const { return m_tcpPort; }
+    void setTcpPort(int port);
+
+    QString tcpToken() const { return m_tcpToken; }
+    void setTcpToken(const QString &token);
+
     bool isShutdownTriggered() const { return m_shutdownTriggered; }
 
     QVariantMap getStatus() const;
     void saveConfig();
     void cancelShutdown();
+    void shutdownNow();
 
 signals:
     void statusChanged(const QVariantMap &status);
 
 private slots:
     void checkLoop();
+    void onNewTcpConnection();
+    void onTcpReadyRead();
 
 private:
     void loadConfig();
@@ -44,6 +59,7 @@ private:
     double getIdleTimeXprintidle();
     void shutdown();
     void sendNotification(const QString &title, const QString &message);
+    void setupTcpServer();
 
     QString m_configPath;
     int m_idleTimeout;      // 秒単位
@@ -52,6 +68,12 @@ private:
     bool m_running;
     bool m_shutdownTriggered;
     double m_currentIdleTime;
+
+    // TCP関連
+    bool m_tcpEnabled;
+    int m_tcpPort;
+    QString m_tcpToken;
+    QTcpServer *m_tcpServer;
 
     QTimer *m_timer;
 };

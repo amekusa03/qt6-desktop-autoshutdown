@@ -17,6 +17,10 @@ AutoShutdownCore::AutoShutdownCore(const QString &configPath, QObject *parent)
     , m_running(false)
     , m_shutdownTriggered(false)
     , m_currentIdleTime(-1)
+    , m_tcpEnabled(true)
+    , m_tcpPort(12345)
+    , m_tcpToken("secret123")
+    , m_tcpServer(nullptr)
 {
     if (m_configPath.isEmpty()) {
         QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
@@ -25,6 +29,9 @@ AutoShutdownCore::AutoShutdownCore(const QString &configPath, QObject *parent)
     }
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this, &AutoShutdownCore::checkLoop);
+
+    m_tcpServer = new QTcpServer(this);
+    connect(m_tcpServer, &QTcpServer::newConnection, this, &AutoShutdownCore::onNewTcpConnection);
 
     loadConfig();
 }
@@ -41,11 +48,17 @@ void AutoShutdownCore::loadConfig()
     m_idleTimeout = settings.value("idle_timeout", 300).toInt();
     m_checkInterval = settings.value("check_interval", 10).toInt();
     m_enabled = settings.value("enabled", true).toBool();
+    m_tcpEnabled = settings.value("tcp_enabled", true).toBool();
+    m_tcpPort = settings.value("tcp_port", 12345).toInt();
+    m_tcpToken = settings.value("tcp_token", "secret123").toString();
     settings.endGroup();
 
     qDebug() << "Config loaded: idle_timeout =" << m_idleTimeout
              << ", check_interval =" << m_checkInterval
-             << ", enabled =" << m_enabled;
+             << ", enabled =" << m_enabled
+             << ", tcp_enabled =" << m_tcpEnabled
+             << ", tcp_port =" << m_tcpPort
+             << ", tcp_token =" << m_tcpToken;
 }
 
 void AutoShutdownCore::saveConfig()
@@ -55,12 +68,18 @@ void AutoShutdownCore::saveConfig()
     settings.setValue("idle_timeout", m_idleTimeout);
     settings.setValue("check_interval", m_checkInterval);
     settings.setValue("enabled", m_enabled);
+    settings.setValue("tcp_enabled", m_tcpEnabled);
+    settings.setValue("tcp_port", m_tcpPort);
+    settings.setValue("tcp_token", m_tcpToken);
     settings.endGroup();
     settings.sync();
 
     qDebug() << "Config saved: idle_timeout =" << m_idleTimeout
              << ", check_interval =" << m_checkInterval
-             << ", enabled =" << m_enabled;
+             << ", enabled =" << m_enabled
+             << ", tcp_enabled =" << m_tcpEnabled
+             << ", tcp_port =" << m_tcpPort
+             << ", tcp_token =" << m_tcpToken;
 }
 
 void AutoShutdownCore::start()
@@ -68,7 +87,7 @@ void AutoShutdownCore::start()
     if (m_running) return;
     m_running = true;
     m_timer->start(m_checkInterval * 1000);
-    sendNotification("AutoShutdown", "Start Auto Shutdown");
+    setupTcpServer();
     qDebug() << "AutoShutdown core started";
 }
 
@@ -77,7 +96,25 @@ void AutoShutdownCore::stop()
     if (!m_running) return;
     m_running = false;
     m_timer->stop();
+    if (m_tcpServer && m_tcpServer->isListening()) {
+        m_tcpServer->close();
+    }
     qDebug() << "AutoShutdown core stopped";
+}
+
+void AutoShutdownCore::setupTcpServer()
+{
+    if (m_tcpServer->isListening()) {
+        m_tcpServer->close();
+    }
+
+    if (m_tcpEnabled && m_running) {
+        if (m_tcpServer->listen(QHostAddress::Any, static_cast<quint16>(m_tcpPort))) {
+            qDebug() << "TCP Server listening on port" << m_tcpPort;
+        } else {
+            qWarning() << "TCP Server failed to listen on port" << m_tcpPort << ":" << m_tcpServer->errorString();
+        }
+    }
 }
 
 void AutoShutdownCore::setEnabled(bool enabled)
@@ -104,6 +141,29 @@ void AutoShutdownCore::setCheckInterval(int interval)
     emit statusChanged(getStatus());
 }
 
+void AutoShutdownCore::setTcpEnabled(bool enabled)
+{
+    if (m_tcpEnabled == enabled) return;
+    m_tcpEnabled = enabled;
+    setupTcpServer();
+    emit statusChanged(getStatus());
+}
+
+void AutoShutdownCore::setTcpPort(int port)
+{
+    if (m_tcpPort == port) return;
+    m_tcpPort = port;
+    setupTcpServer();
+    emit statusChanged(getStatus());
+}
+
+void AutoShutdownCore::setTcpToken(const QString &token)
+{
+    if (m_tcpToken == token) return;
+    m_tcpToken = token;
+    emit statusChanged(getStatus());
+}
+
 QVariantMap AutoShutdownCore::getStatus() const
 {
     QVariantMap status;
@@ -120,7 +180,46 @@ QVariantMap AutoShutdownCore::getStatus() const
     status["running"] = m_running;
     status["shutdown_triggered"] = m_shutdownTriggered;
 
+    status["tcp_enabled"] = m_tcpEnabled;
+    status["tcp_port"] = m_tcpPort;
+    status["tcp_token"] = m_tcpToken;
+    status["tcp_listening"] = m_tcpServer ? m_tcpServer->isListening() : false;
+
     return status;
+}
+
+void AutoShutdownCore::onNewTcpConnection()
+{
+    while (m_tcpServer && m_tcpServer->hasPendingConnections()) {
+        QTcpSocket *socket = m_tcpServer->nextPendingConnection();
+        connect(socket, &QTcpSocket::readyRead, this, &AutoShutdownCore::onTcpReadyRead);
+        connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
+    }
+}
+
+void AutoShutdownCore::onTcpReadyRead()
+{
+    QTcpSocket *socket = qobject_cast<QTcpSocket*>(sender());
+    if (!socket) return;
+
+    QByteArray data = socket->readAll();
+    QString receivedToken = QString::fromUtf8(data).trimmed();
+
+    qDebug() << "Received TCP payload from" << socket->peerAddress().toString() << ":" << receivedToken;
+
+    if (!m_tcpToken.isEmpty() && receivedToken == m_tcpToken.trimmed()) {
+        qWarning() << "Matching shutdown token received via TCP! Triggering immediate shutdown.";
+        socket->write("SHUTDOWN_OK\n");
+        socket->flush();
+        socket->disconnectFromHost();
+
+        shutdownNow();
+    } else {
+        qWarning() << "Invalid token received via TCP:" << receivedToken;
+        socket->write("INVALID_TOKEN\n");
+        socket->flush();
+        socket->disconnectFromHost();
+    }
 }
 
 void AutoShutdownCore::checkLoop()
@@ -196,13 +295,22 @@ double AutoShutdownCore::getIdleTimeXprintidle()
 
 void AutoShutdownCore::shutdown()
 {
-    qWarning() << "Initiating shutdown...";
+    qWarning() << "Initiating standard shutdown (1 min delay)...";
     m_shutdownTriggered = true;
     emit statusChanged(getStatus());
 
-    // 1分後にシャットダウンを実行
-    QProcess::startDetached("sudo", QStringList() << "shutdown" << "-h" << "+1" << "Auto shutdown due to inactivity");
     sendNotification("AutoShutdown", "Idle timeout reached. Shutdown triggered in 1 minute!");
+    QProcess::startDetached("sudo", QStringList() << "shutdown" << "-h" << "+1" << "Auto shutdown due to inactivity");
+}
+
+void AutoShutdownCore::shutdownNow()
+{
+    qWarning() << "Initiating immediate shutdown via TCP command...";
+    m_shutdownTriggered = true;
+    emit statusChanged(getStatus());
+
+    sendNotification("AutoShutdown", "Instant shutdown command received via TCP!");
+    QProcess::startDetached("sudo", QStringList() << "shutdown" << "-h" << "now" << "Instant shutdown via TCP command");
 }
 
 void AutoShutdownCore::cancelShutdown()

@@ -1,4 +1,4 @@
-QT += widgets dbus
+QT += widgets dbus network
 
 CONFIG += c++17
 
