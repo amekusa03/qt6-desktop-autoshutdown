@@ -12,6 +12,7 @@
 MainWindow::MainWindow(AutoShutdownCore *core, QWidget *parent)
     : QMainWindow(parent)
     , m_core(core)
+    , m_shutdownDialog(nullptr)
 {
     setWindowTitle("AutoShutdown");
     setFixedSize(480, 680);
@@ -22,6 +23,7 @@ MainWindow::MainWindow(AutoShutdownCore *core, QWidget *parent)
 
     // コアからのステータス通知を接続
     connect(m_core, &AutoShutdownCore::statusChanged, this, &MainWindow::updateDisplay);
+    connect(m_core, &AutoShutdownCore::shutdownRequested, this, &MainWindow::showShutdownDialog);
 
     // 初期状態の表示
     updateDisplay(m_core->getStatus());
@@ -244,6 +246,7 @@ void MainWindow::buildUi()
     connect(m_logBtn, &QPushButton::clicked, this, &MainWindow::openLog);
     footerRow->addWidget(m_logBtn);
     footerRow->addStretch();
+
     contentLayout->addLayout(footerRow);
 
     mainLayout->addLayout(contentLayout);
@@ -434,6 +437,7 @@ void MainWindow::updateDisplay(const QVariantMap &status)
     QVariant idle = status["idle_time"];
     QVariant remaining = status["remaining"];
     bool warning = status["shutdown_triggered"].toBool();
+    bool warningShown = status["warning_shown"].toBool();
 
     bool tcpEnabled = status["tcp_enabled"].toBool();
     int tcpPort = status["tcp_port"].toInt();
@@ -493,9 +497,26 @@ void MainWindow::updateDisplay(const QVariantMap &status)
     if (warning) {
         m_lblMsg->setText("⚠  シャットダウンが開始されました！");
         m_cancelBtn->setVisible(true);
+    } else if (warningShown) {
+        m_lblMsg->setText("⚠  シャットダウンまで1分を切りました！");
+        m_cancelBtn->setVisible(true);
     } else {
         m_lblMsg->setText("");
         m_cancelBtn->setVisible(false);
+    }
+
+    // ダイアログの表示/非表示
+    if (warningShown && !warning) {
+        // 残り60秒に達した: ダイアログを表示
+        if (!m_shutdownDialog) {
+            showShutdownDialog(60);
+        }
+    } else if (!warningShown && !warning) {
+        // キャンセルされた: ダイアログを閉じる
+        if (m_shutdownDialog) {
+            m_shutdownDialog->close();
+            m_shutdownDialog = nullptr;
+        }
     }
 
     // トレイアイコンの更新
@@ -592,4 +613,22 @@ QString MainWindow::formatTime(double seconds)
     return QString("%1:%2")
         .arg(m, 2, 10, QChar('0'))
         .arg(s, 2, 10, QChar('0'));
+}
+
+void MainWindow::showShutdownDialog(int secondsRemaining)
+{
+    if (m_shutdownDialog) {
+        m_shutdownDialog->close();
+        m_shutdownDialog = nullptr;
+    }
+
+    m_shutdownDialog = new ShutdownDialog(m_core, secondsRemaining, nullptr);
+    m_shutdownDialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(m_shutdownDialog, &QDialog::destroyed, this, [this]() {
+        m_shutdownDialog = nullptr;
+    });
+
+    m_shutdownDialog->show();
+    m_shutdownDialog->raise();
+    m_shutdownDialog->activateWindow();
 }

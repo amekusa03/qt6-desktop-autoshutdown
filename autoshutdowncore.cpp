@@ -16,6 +16,7 @@ AutoShutdownCore::AutoShutdownCore(const QString &configPath, QObject *parent)
     , m_enabled(true)
     , m_running(false)
     , m_shutdownTriggered(false)
+    , m_warningShown(false)
     , m_currentIdleTime(-1)
     , m_tcpEnabled(true)
     , m_tcpPort(12345)
@@ -179,6 +180,7 @@ QVariantMap AutoShutdownCore::getStatus() const
     status["remaining"] = remaining;
     status["running"] = m_running;
     status["shutdown_triggered"] = m_shutdownTriggered;
+    status["warning_shown"] = m_warningShown;
 
     status["tcp_enabled"] = m_tcpEnabled;
     status["tcp_port"] = m_tcpPort;
@@ -226,6 +228,10 @@ void AutoShutdownCore::checkLoop()
 {
     if (!m_enabled) {
         m_currentIdleTime = -1;
+        if (m_warningShown) {
+            m_warningShown = false;
+            emit shutdownCancelled();
+        }
         emit statusChanged(getStatus());
         return;
     }
@@ -233,9 +239,22 @@ void AutoShutdownCore::checkLoop()
     double idleTime = getIdleTime();
     m_currentIdleTime = idleTime;
 
-    emit statusChanged(getStatus());
-
     if (idleTime >= 0) {
+        double remaining = static_cast<double>(m_idleTimeout) - idleTime;
+
+        // ユーザーが再び操作したら警告をリセット
+        if (m_warningShown && !m_shutdownTriggered && remaining > 60.0) {
+            m_warningShown = false;
+            emit shutdownCancelled();
+        }
+
+        // タイムアウト60秒前: ダイアログを表示（まだshutdownは実行しない）
+        if (remaining <= 60.0 && remaining > 0.0 && !m_warningShown && !m_shutdownTriggered) {
+            qWarning() << "Shutdown warning: remaining=" << remaining << "sec";
+            m_warningShown = true;
+        }
+
+        // タイムアウト到達: ダイアログを無視したので実際にシャットダウン実行
         if (idleTime >= m_idleTimeout && !m_shutdownTriggered) {
             qWarning() << "Idle timeout reached:" << idleTime << ">=" << m_idleTimeout;
             shutdown();
@@ -243,6 +262,8 @@ void AutoShutdownCore::checkLoop()
     } else {
         qWarning() << "Could not determine idle time, retrying...";
     }
+
+    emit statusChanged(getStatus());
 }
 
 double AutoShutdownCore::getIdleTime()
@@ -298,6 +319,7 @@ void AutoShutdownCore::shutdown()
     qWarning() << "Initiating standard shutdown (1 min delay)...";
     m_shutdownTriggered = true;
     emit statusChanged(getStatus());
+    emit shutdownRequested(60);
 
     sendNotification("AutoShutdown", "Idle timeout reached. Shutdown triggered in 1 minute!");
     QProcess::startDetached("sudo", QStringList() << "shutdown" << "-h" << "+1" << "Auto shutdown due to inactivity");
@@ -318,8 +340,18 @@ void AutoShutdownCore::cancelShutdown()
     qWarning() << "Cancelling shutdown...";
     QProcess::startDetached("sudo", QStringList() << "shutdown" << "-c");
     m_shutdownTriggered = false;
+    m_warningShown = false;
     emit statusChanged(getStatus());
+    emit shutdownCancelled();
     sendNotification("AutoShutdown", "Shutdown cancelled");
+}
+
+void AutoShutdownCore::cancelWarning()
+{
+    qWarning() << "Shutdown warning cancelled by user.";
+    m_warningShown = false;
+    emit statusChanged(getStatus());
+    emit shutdownCancelled();
 }
 
 void AutoShutdownCore::sendNotification(const QString &title, const QString &message)

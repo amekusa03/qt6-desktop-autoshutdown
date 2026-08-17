@@ -42,10 +42,13 @@ public:
     QVariantMap getStatus() const;
     void saveConfig();
     void cancelShutdown();
+    void cancelWarning();
     void shutdownNow();
 
 signals:
     void statusChanged(const QVariantMap &status);
+    void shutdownRequested(int secondsRemaining);
+    void shutdownCancelled();
 
 private slots:
     void checkLoop();
@@ -67,6 +70,7 @@ private:
     bool m_enabled;
     bool m_running;
     bool m_shutdownTriggered;
+    bool m_warningShown;
     double m_currentIdleTime;
 
     // TCP関連

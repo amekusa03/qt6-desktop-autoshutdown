@@ -12,6 +12,7 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include "autoshutdowncore.h"
+#include "shutdowndialog.h"
 
 class MainWindow : public QMainWindow
 {
@@ -34,6 +35,7 @@ private slots:
     void openLog();
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void quitApp();
+    void showShutdownDialog(int secondsRemaining);
 
 private:
     void buildUi();
@@ -66,6 +68,7 @@ private:
     QPushButton *m_saveBtn;
     QPushButton *m_cancelBtn;
     QPushButton *m_logBtn;
+    ShutdownDialog *m_shutdownDialog;
 };
 
 #endif // MAINWINDOW_H
