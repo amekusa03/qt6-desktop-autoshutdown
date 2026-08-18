@@ -15,7 +15,7 @@ MainWindow::MainWindow(AutoShutdownCore *core, QWidget *parent)
     , m_shutdownDialog(nullptr)
 {
     setWindowTitle("AutoShutdown");
-    setFixedSize(480, 680);
+    setFixedSize(500, 820);
 
     buildUi();
     setupTrayIcon();
@@ -209,17 +209,25 @@ void MainWindow::buildUi()
     tcpPortRow->addWidget(m_spinTcpPort);
     contentLayout->addLayout(tcpPortRow);
 
-    QHBoxLayout *tcpTokenRow = new QHBoxLayout();
-    QLabel *lblTcpToken = new QLabel("シャットダウントークン", centralWidget);
-    lblTcpToken->setStyleSheet("font-size: 12px; color: #eaeaea;");
-    m_txtTcpToken = new QLineEdit(centralWidget);
-    m_txtTcpToken->setText(m_core->tcpToken());
-    m_txtTcpToken->setPlaceholderText("secret123");
-    m_txtTcpToken->setFixedWidth(160);
-    tcpTokenRow->addWidget(lblTcpToken);
-    tcpTokenRow->addStretch();
-    tcpTokenRow->addWidget(m_txtTcpToken);
-    contentLayout->addLayout(tcpTokenRow);
+    auto createTokenRow = [this, centralWidget](const QString &label, QLineEdit *&lineEdit, const QString &text, const QString &placeholder) {
+        QHBoxLayout *row = new QHBoxLayout();
+        QLabel *lbl = new QLabel(label, centralWidget);
+        lbl->setStyleSheet("font-size: 12px; color: #eaeaea;");
+        lineEdit = new QLineEdit(centralWidget);
+        lineEdit->setText(text);
+        lineEdit->setPlaceholderText(placeholder);
+        lineEdit->setFixedWidth(210);
+        row->addWidget(lbl);
+        row->addStretch();
+        row->addWidget(lineEdit);
+        return row;
+    };
+
+    contentLayout->addLayout(createTokenRow("シャットダウントークン", m_txtTcpToken, m_core->tcpToken(), "secure_pc_shutdown_token_12345"));
+    contentLayout->addLayout(createTokenRow("音量UPトークン", m_txtTcpTokenVolUp, m_core->tcpTokenVolUp(), "secure_pc_vol_up_token_12345"));
+    contentLayout->addLayout(createTokenRow("音量DOWNトークン", m_txtTcpTokenVolDown, m_core->tcpTokenVolDown(), "secure_pc_vol_down_token_12345"));
+    contentLayout->addLayout(createTokenRow("ミュート切替トークン", m_txtTcpTokenVolMute, m_core->tcpTokenVolMute(), "secure_pc_vol_mute_token_12345"));
+    contentLayout->addLayout(createTokenRow("音量取得トークン", m_txtTcpTokenVolGet, m_core->tcpTokenVolGet(), "secure_pc_vol_get_token_12345"));
 
     m_lblTcpStatus = new QLabel("", centralWidget);
     m_lblTcpStatus->setStyleSheet("font-size: 11px; color: #606080;");
@@ -553,6 +561,18 @@ void MainWindow::applySettings()
     }
     if (m_txtTcpToken) {
         m_core->setTcpToken(m_txtTcpToken->text().trimmed());
+    }
+    if (m_txtTcpTokenVolUp) {
+        m_core->setTcpTokenVolUp(m_txtTcpTokenVolUp->text().trimmed());
+    }
+    if (m_txtTcpTokenVolDown) {
+        m_core->setTcpTokenVolDown(m_txtTcpTokenVolDown->text().trimmed());
+    }
+    if (m_txtTcpTokenVolMute) {
+        m_core->setTcpTokenVolMute(m_txtTcpTokenVolMute->text().trimmed());
+    }
+    if (m_txtTcpTokenVolGet) {
+        m_core->setTcpTokenVolGet(m_txtTcpTokenVolGet->text().trimmed());
     }
 
     m_core->saveConfig();

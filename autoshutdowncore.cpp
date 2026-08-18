@@ -7,6 +7,8 @@
 #include <QStandardPaths>
 #include <QtDBus/QDBusInterface>
 #include <QtDBus/QDBusReply>
+#include <QRegularExpression>
+#include <QProcessEnvironment>
 
 AutoShutdownCore::AutoShutdownCore(const QString &configPath, QObject *parent)
     : QObject(parent)
@@ -19,8 +21,12 @@ AutoShutdownCore::AutoShutdownCore(const QString &configPath, QObject *parent)
     , m_warningShown(false)
     , m_currentIdleTime(-1)
     , m_tcpEnabled(true)
-    , m_tcpPort(12345)
-    , m_tcpToken("secret123")
+    , m_tcpPort(7777)
+    , m_tcpToken("secure_pc_shutdown_token_12345")
+    , m_tcpTokenVolUp("secure_pc_vol_up_token_12345")
+    , m_tcpTokenVolDown("secure_pc_vol_down_token_12345")
+    , m_tcpTokenVolMute("secure_pc_vol_mute_token_12345")
+    , m_tcpTokenVolGet("secure_pc_vol_get_token_12345")
     , m_tcpServer(nullptr)
 {
     if (m_configPath.isEmpty()) {
@@ -50,8 +56,12 @@ void AutoShutdownCore::loadConfig()
     m_checkInterval = settings.value("check_interval", 10).toInt();
     m_enabled = settings.value("enabled", true).toBool();
     m_tcpEnabled = settings.value("tcp_enabled", true).toBool();
-    m_tcpPort = settings.value("tcp_port", 12345).toInt();
-    m_tcpToken = settings.value("tcp_token", "secret123").toString();
+    m_tcpPort = settings.value("tcp_port", 7777).toInt();
+    m_tcpToken = settings.value("tcp_token", "secure_pc_shutdown_token_12345").toString();
+    m_tcpTokenVolUp = settings.value("tcp_token_vol_up", "secure_pc_vol_up_token_12345").toString();
+    m_tcpTokenVolDown = settings.value("tcp_token_vol_down", "secure_pc_vol_down_token_12345").toString();
+    m_tcpTokenVolMute = settings.value("tcp_token_vol_mute", "secure_pc_vol_mute_token_12345").toString();
+    m_tcpTokenVolGet = settings.value("tcp_token_vol_get", "secure_pc_vol_get_token_12345").toString();
     settings.endGroup();
 
     qDebug() << "Config loaded: idle_timeout =" << m_idleTimeout
@@ -72,6 +82,10 @@ void AutoShutdownCore::saveConfig()
     settings.setValue("tcp_enabled", m_tcpEnabled);
     settings.setValue("tcp_port", m_tcpPort);
     settings.setValue("tcp_token", m_tcpToken);
+    settings.setValue("tcp_token_vol_up", m_tcpTokenVolUp);
+    settings.setValue("tcp_token_vol_down", m_tcpTokenVolDown);
+    settings.setValue("tcp_token_vol_mute", m_tcpTokenVolMute);
+    settings.setValue("tcp_token_vol_get", m_tcpTokenVolGet);
     settings.endGroup();
     settings.sync();
 
@@ -165,6 +179,34 @@ void AutoShutdownCore::setTcpToken(const QString &token)
     emit statusChanged(getStatus());
 }
 
+void AutoShutdownCore::setTcpTokenVolUp(const QString &token)
+{
+    if (m_tcpTokenVolUp == token) return;
+    m_tcpTokenVolUp = token;
+    emit statusChanged(getStatus());
+}
+
+void AutoShutdownCore::setTcpTokenVolDown(const QString &token)
+{
+    if (m_tcpTokenVolDown == token) return;
+    m_tcpTokenVolDown = token;
+    emit statusChanged(getStatus());
+}
+
+void AutoShutdownCore::setTcpTokenVolMute(const QString &token)
+{
+    if (m_tcpTokenVolMute == token) return;
+    m_tcpTokenVolMute = token;
+    emit statusChanged(getStatus());
+}
+
+void AutoShutdownCore::setTcpTokenVolGet(const QString &token)
+{
+    if (m_tcpTokenVolGet == token) return;
+    m_tcpTokenVolGet = token;
+    emit statusChanged(getStatus());
+}
+
 QVariantMap AutoShutdownCore::getStatus() const
 {
     QVariantMap status;
@@ -185,6 +227,10 @@ QVariantMap AutoShutdownCore::getStatus() const
     status["tcp_enabled"] = m_tcpEnabled;
     status["tcp_port"] = m_tcpPort;
     status["tcp_token"] = m_tcpToken;
+    status["tcp_token_vol_up"] = m_tcpTokenVolUp;
+    status["tcp_token_vol_down"] = m_tcpTokenVolDown;
+    status["tcp_token_vol_mute"] = m_tcpTokenVolMute;
+    status["tcp_token_vol_get"] = m_tcpTokenVolGet;
     status["tcp_listening"] = m_tcpServer ? m_tcpServer->isListening() : false;
 
     return status;
@@ -209,18 +255,98 @@ void AutoShutdownCore::onTcpReadyRead()
 
     qDebug() << "Received TCP payload from" << socket->peerAddress().toString() << ":" << receivedToken;
 
-    if (!m_tcpToken.isEmpty() && receivedToken == m_tcpToken.trimmed()) {
+    if (!m_tcpToken.trimmed().isEmpty() && receivedToken == m_tcpToken.trimmed()) {
         qWarning() << "Matching shutdown token received via TCP! Triggering immediate shutdown.";
-        socket->write("SHUTDOWN_OK\n");
+        socket->write("ACK: Shutting down\n");
         socket->flush();
         socket->disconnectFromHost();
 
         shutdownNow();
-    } else {
-        qWarning() << "Invalid token received via TCP:" << receivedToken;
-        socket->write("INVALID_TOKEN\n");
+    } else if (!m_tcpTokenVolUp.trimmed().isEmpty() && receivedToken == m_tcpTokenVolUp.trimmed()) {
+        qInfo() << "Volume UP token received via TCP.";
+        volumeUp();
+        socket->write("ACK: Volume UP\n");
         socket->flush();
         socket->disconnectFromHost();
+    } else if (!m_tcpTokenVolDown.trimmed().isEmpty() && receivedToken == m_tcpTokenVolDown.trimmed()) {
+        qInfo() << "Volume DOWN token received via TCP.";
+        volumeDown();
+        socket->write("ACK: Volume DOWN\n");
+        socket->flush();
+        socket->disconnectFromHost();
+    } else if (!m_tcpTokenVolMute.trimmed().isEmpty() && receivedToken == m_tcpTokenVolMute.trimmed()) {
+        qInfo() << "Volume MUTE token received via TCP.";
+        volumeMuteToggle();
+        socket->write("ACK: Volume MUTE toggled\n");
+        socket->flush();
+        socket->disconnectFromHost();
+    } else if (!m_tcpTokenVolGet.trimmed().isEmpty() && receivedToken == m_tcpTokenVolGet.trimmed()) {
+        qInfo() << "Volume GET token received via TCP.";
+        int vol = 100;
+        bool muted = false;
+        getVolumeAndMute(vol, muted);
+        QString response = QString("ACK: VOL=%1,MUTE=%2\n").arg(vol).arg(muted ? 1 : 0);
+        socket->write(response.toUtf8());
+        socket->flush();
+        socket->disconnectFromHost();
+    } else {
+        qWarning() << "Invalid token received via TCP:" << receivedToken;
+        socket->write("ERR: Invalid token\n");
+        socket->flush();
+        socket->disconnectFromHost();
+    }
+}
+
+void AutoShutdownCore::volumeUp()
+{
+    qDebug() << "Executing Volume UP (+5%)...";
+    QProcess::execute("pactl", QStringList() << "set-sink-volume" << "@DEFAULT_SINK@" << "+5%");
+}
+
+void AutoShutdownCore::volumeDown()
+{
+    qDebug() << "Executing Volume DOWN (-5%)...";
+    QProcess::execute("pactl", QStringList() << "set-sink-volume" << "@DEFAULT_SINK@" << "-5%");
+}
+
+void AutoShutdownCore::volumeMuteToggle()
+{
+    qDebug() << "Executing Volume MUTE toggle...";
+    QProcess::execute("pactl", QStringList() << "set-sink-mute" << "@DEFAULT_SINK@" << "toggle");
+}
+
+void AutoShutdownCore::getVolumeAndMute(int &volume, bool &isMuted)
+{
+    volume = 100;
+    isMuted = false;
+
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("LC_ALL", "C");
+
+    // 音量(%)の取得
+    QProcess volProcess;
+    volProcess.setProcessEnvironment(env);
+    volProcess.start("pactl", QStringList() << "get-sink-volume" << "@DEFAULT_SINK@");
+    if (volProcess.waitForFinished(3000) && volProcess.exitCode() == 0) {
+        QString volOut = QString::fromUtf8(volProcess.readAllStandardOutput());
+        QRegularExpression rx("(\\d+)%");
+        QRegularExpressionMatch match = rx.match(volOut);
+        if (match.hasMatch()) {
+            volume = match.captured(1).toInt();
+        }
+    }
+
+    // ミュート状態の取得
+    QProcess muteProcess;
+    muteProcess.setProcessEnvironment(env);
+    muteProcess.start("pactl", QStringList() << "get-sink-mute" << "@DEFAULT_SINK@");
+    if (muteProcess.waitForFinished(3000) && muteProcess.exitCode() == 0) {
+        QString muteOut = QString::fromUtf8(muteProcess.readAllStandardOutput()).toLower();
+        if (muteOut.contains("yes")) {
+            isMuted = true;
+        } else {
+            isMuted = false;
+        }
     }
 }
 

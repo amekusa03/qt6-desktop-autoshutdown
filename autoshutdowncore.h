@@ -37,6 +37,18 @@ public:
     QString tcpToken() const { return m_tcpToken; }
     void setTcpToken(const QString &token);
 
+    QString tcpTokenVolUp() const { return m_tcpTokenVolUp; }
+    void setTcpTokenVolUp(const QString &token);
+
+    QString tcpTokenVolDown() const { return m_tcpTokenVolDown; }
+    void setTcpTokenVolDown(const QString &token);
+
+    QString tcpTokenVolMute() const { return m_tcpTokenVolMute; }
+    void setTcpTokenVolMute(const QString &token);
+
+    QString tcpTokenVolGet() const { return m_tcpTokenVolGet; }
+    void setTcpTokenVolGet(const QString &token);
+
     bool isShutdownTriggered() const { return m_shutdownTriggered; }
 
     QVariantMap getStatus() const;
@@ -44,6 +56,12 @@ public:
     void cancelShutdown();
     void cancelWarning();
     void shutdownNow();
+
+    // 音量コントロール
+    void volumeUp();
+    void volumeDown();
+    void volumeMuteToggle();
+    void getVolumeAndMute(int &volume, bool &isMuted);
 
 signals:
     void statusChanged(const QVariantMap &status);
@@ -77,6 +95,10 @@ private:
     bool m_tcpEnabled;
     int m_tcpPort;
     QString m_tcpToken;
+    QString m_tcpTokenVolUp;
+    QString m_tcpTokenVolDown;
+    QString m_tcpTokenVolMute;
+    QString m_tcpTokenVolGet;
     QTcpServer *m_tcpServer;
 
     QTimer *m_timer;
