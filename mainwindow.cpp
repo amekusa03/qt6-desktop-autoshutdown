@@ -15,7 +15,7 @@ MainWindow::MainWindow(AutoShutdownCore *core, QWidget *parent)
     , m_shutdownDialog(nullptr)
 {
     setWindowTitle("AutoShutdown");
-    setFixedSize(500, 820);
+    setFixedSize(500, 600);
 
     buildUi();
     setupTrayIcon();
@@ -47,14 +47,14 @@ void MainWindow::buildUi()
     // ---------------------------
     QFrame *headerFrame = new QFrame(centralWidget);
     headerFrame->setObjectName("headerFrame");
-    headerFrame->setFixedHeight(100);
+    headerFrame->setFixedHeight(72);
     QVBoxLayout *headerLayout = new QVBoxLayout(headerFrame);
-    headerLayout->setContentsMargins(0, 10, 0, 10);
-    headerLayout->setSpacing(2);
+    headerLayout->setContentsMargins(0, 6, 0, 6);
+    headerLayout->setSpacing(1);
 
     QLabel *lblIcon = new QLabel("⏻", headerFrame);
     lblIcon->setAlignment(Qt::AlignCenter);
-    lblIcon->setStyleSheet("font-size: 32px; color: #e94560;");
+    lblIcon->setStyleSheet("font-size: 22px; color: #e94560;");
     headerLayout->addWidget(lblIcon);
 
     QLabel *lblTitle = new QLabel("Auto Shutdown", headerFrame);
@@ -73,16 +73,16 @@ void MainWindow::buildUi()
     // コンテンツ部
     // ---------------------------
     QVBoxLayout *contentLayout = new QVBoxLayout();
-    contentLayout->setContentsMargins(24, 12, 24, 12);
-    contentLayout->setSpacing(10);
+    contentLayout->setContentsMargins(24, 8, 24, 8);
+    contentLayout->setSpacing(6);
 
     // ステータスカード
     QFrame *statusFrame = new QFrame(centralWidget);
     statusFrame->setObjectName("statusFrame");
-    statusFrame->setFixedHeight(95);
+    statusFrame->setFixedHeight(75);
     QVBoxLayout *statusLayout = new QVBoxLayout(statusFrame);
-    statusLayout->setContentsMargins(16, 8, 16, 8);
-    statusLayout->setSpacing(4);
+    statusLayout->setContentsMargins(12, 6, 12, 6);
+    statusLayout->setSpacing(2);
 
     QLabel *lblStatusTitle = new QLabel("現在のステータス", statusFrame);
     lblStatusTitle->setStyleSheet("font-size: 10px; color: #606080;");
@@ -145,41 +145,37 @@ void MainWindow::buildUi()
     contentLayout->addLayout(toggleRow);
 
     // コントロール：無操作タイムアウト
-    QLabel *lblTimeout = new QLabel("無操作タイムアウト", centralWidget);
-    lblTimeout->setStyleSheet("font-size: 13px; color: #eaeaea;");
-    contentLayout->addWidget(lblTimeout);
-
     QHBoxLayout *timeoutRow = new QHBoxLayout();
+    QLabel *lblTimeout = new QLabel("無操作タイムアウト", centralWidget);
+    lblTimeout->setStyleSheet("font-size: 12px; color: #eaeaea;");
+    lblTimeout->setFixedWidth(120);
     m_sliderTimeout = new QSlider(Qt::Horizontal, centralWidget);
     m_sliderTimeout->setRange(60, 3600);
     m_sliderTimeout->setValue(m_core->idleTimeout());
     connect(m_sliderTimeout, &QSlider::valueChanged, this, &MainWindow::onTimeoutSliderChanged);
-    
     m_lblTimeoutVal = new QLabel(formatTime(m_sliderTimeout->value()), centralWidget);
-    m_lblTimeoutVal->setFixedWidth(80);
+    m_lblTimeoutVal->setFixedWidth(60);
     m_lblTimeoutVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lblTimeoutVal->setStyleSheet("font-family: Monospace; font-size: 12px; color: #e94560;");
-    
+    timeoutRow->addWidget(lblTimeout);
     timeoutRow->addWidget(m_sliderTimeout);
     timeoutRow->addWidget(m_lblTimeoutVal);
     contentLayout->addLayout(timeoutRow);
 
     // コントロール：チェック間隔
-    QLabel *lblInterval = new QLabel("チェック間隔", centralWidget);
-    lblInterval->setStyleSheet("font-size: 13px; color: #eaeaea;");
-    contentLayout->addWidget(lblInterval);
-
     QHBoxLayout *intervalRow = new QHBoxLayout();
+    QLabel *lblInterval = new QLabel("チェック間隔", centralWidget);
+    lblInterval->setStyleSheet("font-size: 12px; color: #eaeaea;");
+    lblInterval->setFixedWidth(120);
     m_sliderInterval = new QSlider(Qt::Horizontal, centralWidget);
     m_sliderInterval->setRange(5, 60);
     m_sliderInterval->setValue(m_core->checkInterval());
     connect(m_sliderInterval, &QSlider::valueChanged, this, &MainWindow::onIntervalSliderChanged);
-    
     m_lblIntervalVal = new QLabel(QString::number(m_sliderInterval->value()) + "秒", centralWidget);
-    m_lblIntervalVal->setFixedWidth(80);
+    m_lblIntervalVal->setFixedWidth(60);
     m_lblIntervalVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lblIntervalVal->setStyleSheet("font-family: Monospace; font-size: 12px; color: #e94560;");
-    
+    intervalRow->addWidget(lblInterval);
     intervalRow->addWidget(m_sliderInterval);
     intervalRow->addWidget(m_lblIntervalVal);
     contentLayout->addLayout(intervalRow);
@@ -224,10 +220,6 @@ void MainWindow::buildUi()
     };
 
     contentLayout->addLayout(createTokenRow("シャットダウントークン", m_txtTcpToken, m_core->tcpToken(), "secure_pc_shutdown_token_12345"));
-    contentLayout->addLayout(createTokenRow("音量UPトークン", m_txtTcpTokenVolUp, m_core->tcpTokenVolUp(), "secure_pc_vol_up_token_12345"));
-    contentLayout->addLayout(createTokenRow("音量DOWNトークン", m_txtTcpTokenVolDown, m_core->tcpTokenVolDown(), "secure_pc_vol_down_token_12345"));
-    contentLayout->addLayout(createTokenRow("ミュート切替トークン", m_txtTcpTokenVolMute, m_core->tcpTokenVolMute(), "secure_pc_vol_mute_token_12345"));
-    contentLayout->addLayout(createTokenRow("音量取得トークン", m_txtTcpTokenVolGet, m_core->tcpTokenVolGet(), "secure_pc_vol_get_token_12345"));
 
     m_lblTcpStatus = new QLabel("", centralWidget);
     m_lblTcpStatus->setStyleSheet("font-size: 11px; color: #606080;");
@@ -561,18 +553,6 @@ void MainWindow::applySettings()
     }
     if (m_txtTcpToken) {
         m_core->setTcpToken(m_txtTcpToken->text().trimmed());
-    }
-    if (m_txtTcpTokenVolUp) {
-        m_core->setTcpTokenVolUp(m_txtTcpTokenVolUp->text().trimmed());
-    }
-    if (m_txtTcpTokenVolDown) {
-        m_core->setTcpTokenVolDown(m_txtTcpTokenVolDown->text().trimmed());
-    }
-    if (m_txtTcpTokenVolMute) {
-        m_core->setTcpTokenVolMute(m_txtTcpTokenVolMute->text().trimmed());
-    }
-    if (m_txtTcpTokenVolGet) {
-        m_core->setTcpTokenVolGet(m_txtTcpTokenVolGet->text().trimmed());
     }
 
     m_core->saveConfig();

@@ -63,10 +63,6 @@ private:
     QCheckBox *m_chkTcpEnabled;
     QSpinBox *m_spinTcpPort;
     QLineEdit *m_txtTcpToken;
-    QLineEdit *m_txtTcpTokenVolUp;
-    QLineEdit *m_txtTcpTokenVolDown;
-    QLineEdit *m_txtTcpTokenVolMute;
-    QLineEdit *m_txtTcpTokenVolGet;
     QLabel *m_lblTcpStatus;
 
     QPushButton *m_saveBtn;
